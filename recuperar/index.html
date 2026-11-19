@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Nueva contraseña · MG Coach</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font-family: system-ui, sans-serif; color: #1c2430; background: #f6f4ef; line-height: 1.5; }
+    main { max-width: 26rem; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+    h1 { font-size: 1.7rem; letter-spacing: -0.02em; margin: 0 0 0.4rem; }
+    p { margin: 0 0 1.25rem; color: #3d4754; }
+    label { display: block; font-weight: 600; font-size: 0.95rem; margin: 0 0 0.35rem; }
+    input { box-sizing: border-box; width: 100%; height: 3rem; padding: 0 0.85rem; font-size: 1rem; border: 1.4px solid #c9cfd6; border-radius: 0.8rem; background: #fff; margin-bottom: 1rem; }
+    input:focus { outline: none; border-color: #0b2a4a; }
+    button { width: 100%; height: 3.25rem; border: 0; border-radius: 0.9rem; background: #0b2a4a; color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: 0.55; cursor: default; }
+    .error { color: #b3261e; font-size: 0.95rem; min-height: 1.4rem; margin: 0 0 1rem; }
+    .ok { padding: 1rem 1.1rem; border-radius: 0.9rem; background: #e7f5ec; color: #1d5b34; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Elegí tu nueva contraseña</h1>
+
+    <section id="form-box">
+      <p>Después entrás a la app MG Coach con tu mail y esta contraseña.</p>
+      <form id="form" novalidate>
+        <label for="a">Nueva contraseña</label>
+        <input id="a" type="password" autocomplete="new-password" minlength="6" required>
+        <label for="b">Repetila</label>
+        <input id="b" type="password" autocomplete="new-password" minlength="6" required>
+        <div class="error" id="error" role="alert"></div>
+        <button id="save" type="submit">Guardar</button>
+      </form>
+    </section>
+
+    <p class="ok" id="done" hidden>Listo. Ya podés entrar a la app con tu nueva contraseña.</p>
+    <p class="error" id="invalid" hidden>Este enlace no sirve o ya venció. Pedí uno nuevo desde la app, en «¿Olvidaste la contraseña?».</p>
+  </main>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const supabase = createClient(
+      'https://afxfcjlkqkhonvordneo.supabase.co',
+      'sb_publishable_BEfUU31PNKTx1GkOujZLWA_4gPO_1jy',
+      { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
+    );
+
+    const params = new URLSearchParams(location.search);
+    const tokenHash = params.get('token_hash');
+    const type = params.get('type');
+
+    const formBox = document.getElementById('form-box');
+    const form = document.getElementById('form');
+    const a = document.getElementById('a');
+    const b = document.getElementById('b');
+    const error = document.getElementById('error');
+    const save = document.getElementById('save');
+
+    function invalid() {
+      formBox.hidden = true;
+      document.getElementById('invalid').hidden = false;
+    }
+
+    if (!tokenHash || type !== 'recovery') invalid();
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      error.textContent = '';
+      if (a.value.length < 6) {
+        error.textContent = 'La contraseña tiene al menos 6 caracteres.';
+        return;
+      }
+      if (a.value !== b.value) {
+        error.textContent = 'Las dos tienen que coincidir.';
+        return;
+      }
+      save.disabled = true;
+      save.textContent = 'Guardando…';
+
+      const verified = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+      if (verified.error) {
+        invalid();
+        return;
+      }
+
+      const updated = await supabase.auth.updateUser({ password: a.value, data: { clave_propia: true } });
+      if (updated.error) {
+        save.disabled = false;
+        save.textContent = 'Guardar';
+        error.textContent = 'No se pudo guardar. Probá con otra contraseña o pedí un enlace nuevo.';
+        return;
+      }
+
+      await supabase.auth.signOut();
+      formBox.hidden = true;
+      document.getElementById('done').hidden = false;
+    });
+  </script>
+</body>
+</html>
