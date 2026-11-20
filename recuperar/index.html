@@ -51,8 +51,12 @@
     );
 
     const params = new URLSearchParams(location.search);
+    const hash = new URLSearchParams(location.hash.slice(1));
     const tokenHash = params.get('token_hash');
-    const type = params.get('type');
+    const accessToken = hash.get('access_token');
+    const refreshToken = hash.get('refresh_token');
+    const type = params.get('type') ?? hash.get('type');
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
 
     const formBox = document.getElementById('form-box');
     const form = document.getElementById('form');
@@ -66,7 +70,9 @@
       document.getElementById('invalid').hidden = false;
     }
 
-    if (!tokenHash || type !== 'recovery') invalid();
+    const conToken = tokenHash && type === 'recovery';
+    const conSesion = accessToken && refreshToken && type === 'recovery';
+    if (!conToken && !conSesion) invalid();
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -82,7 +88,9 @@
       save.disabled = true;
       save.textContent = 'Guardando…';
 
-      const verified = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+      const verified = conToken
+        ? await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+        : await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
       if (verified.error) {
         invalid();
         return;
